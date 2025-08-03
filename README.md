@@ -34,9 +34,9 @@ project-root/
 
 ```json
 {
-  "default": "default-src 'self'; script-src 'self'; style-src 'self';",
-  "dev": "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;",
-  "prod": "default-src 'self'; script-src 'self'; style-src 'self'; object-src 'none';"
+  "dev": "default-src * 'unsafe-inline' 'unsafe-eval';",
+  "prod": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https://api.example.com; base-uri 'self';",
+  "default": "default-src 'self';"
 }
 ```
 
@@ -49,18 +49,27 @@ project-root/
 ## 🛠️ `inject-csp.cjs` Script
 
 ```js
+// scripts/inject-csp.cjs
 const fs = require("fs");
-const csp = require("../csp.json");
-const mode = process.env.NODE_ENV || "default";
+const path = require("path");
 
-const indexPath = "dist/index.html";
+const env = process.env.NODE_ENV || "prod";
+const cspConfig = JSON.parse(
+  fs.readFileSync(path.join(process.cwd(), "csp.json"), "utf8")
+);
+const csp = cspConfig[env] || cspConfig.default;
+
+const indexPath = path.join(process.cwd(), "dist", "index.html");
 let html = fs.readFileSync(indexPath, "utf8");
 
-const cspTag = `<meta http-equiv="Content-Security-Policy" content="${csp[mode]}">`;
-
-html = html.replace("<head>", `<head>\n  ${cspTag}`);
-fs.writeFileSync(indexPath, html);
-console.log("✅ CSP meta tag injected for:", mode);
+if (!html.includes("Content-Security-Policy")) {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${csp}">`;
+  html = html.replace("<head>", `<head>\n  ${meta}`);
+  fs.writeFileSync(indexPath, html);
+  console.log(`✅ Injected CSP for "${env}"`);
+} else {
+  console.log("ℹ️ CSP already exists in index.html");
+}
 ```
 
 ---
